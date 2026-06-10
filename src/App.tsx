@@ -31,6 +31,43 @@ import {
 const PLACEHOLDER_PNG_BASE64 =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
+// Helper to compress base64 images client-side down to dynamic max width/height & Jpeg quality
+const compressImage = (base64Str: string, maxDimension = 1200, quality = 0.82): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      // Calculate resized dimensions if needed
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } else {
+        resolve(base64Str);
+      }
+    };
+    img.onerror = () => {
+      resolve(base64Str);
+    };
+    img.src = base64Str;
+  });
+};
+
 // Beautiful, high-quality starting sample records to guide the user instantly
 const INITIAL_DEMO_RECORDS: WrongQuestionRecord[] = [
   {
@@ -150,9 +187,16 @@ export default function App() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setSelectedImage(reader.result as string);
+    reader.onloadend = async () => {
+      const originalBase64 = reader.result as string;
       setScanError(null);
+      try {
+        // Compress the image down before storing/sending, resolving Vercel payload limit issues
+        const compressed = await compressImage(originalBase64);
+        setSelectedImage(compressed);
+      } catch (err) {
+        setSelectedImage(originalBase64);
+      }
     };
     reader.readAsDataURL(file);
   };

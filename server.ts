@@ -302,7 +302,8 @@ async function startServer() {
   // Serve static files in production as fallback
   if (process.env.NODE_ENV !== "production") {
     // Development server with Vite integration
-    const { createServer: createViteServer } = await import("vite");
+    const viteModule = "vite";
+    const { createServer: createViteServer } = await import(viteModule);
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -325,8 +326,10 @@ async function startServer() {
   }
 }
 
-startServer().catch((e) => {
-  console.error("Fatal server startup error:", e);
-});
+if (!process.env.VERCEL) {
+  startServer().catch((e) => {
+    console.error("Fatal server startup error:", e);
+  });
+}
 
 export default app;
